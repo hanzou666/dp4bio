@@ -74,23 +74,29 @@ class Alignment(metaclass=ABCMeta):
 
     @abstractmethod
     def _init_dp_table(self):
+        """DPテーブルの初期化"""
         pass
 
     @abstractmethod
     def _calculate_score(self):
+        """DPテーブルのセルを漸化式に沿って埋め、スコアを計算する"""
         pass
 
     @abstractmethod
     def _traceback(self):
+        """DPの結果から、アラインメント結果を取り出す"""
         pass
 
     def _generate_dp_table(self):
+        """クエリとターゲット配列をもとにDPテーブルを生成する"""
         return [[0 for _ in range(self.tlen + 1)] for _ in range(self.qlen + 1)]
 
     def _s(self, x, y):
+        """マッチ・ミスマッチの置換行列"""
         return self.match_score if x == y else self.mismatch_penalty
 
     def run(self):
+        """アラインメントを実行し、結果を出力する"""
         self._init_dp_table()
         self._calculate_score()
         self._traceback()
@@ -98,6 +104,7 @@ class Alignment(metaclass=ABCMeta):
 
 
 class NeedlemanWunsch(Alignment):
+    """グローバルアラインメント"""
     def _init_dp_table(self):
         self.dp_table[0][0] = 0
         for i in range(1, self.qlen + 1):
@@ -145,6 +152,7 @@ class NeedlemanWunsch(Alignment):
 
 
 class NeedlemanWunschGotoh(Alignment):
+    """アフィンギャップペナルティつきグローバルアラインメント"""
     def __init__(self, q, t, A, B, D, E):
         super().__init__(q, t, A, B, D)
         self.ext_penalty = E
@@ -190,7 +198,7 @@ class NeedlemanWunschGotoh(Alignment):
     def _traceback(self):
         i = self.qlen
         j = self.tlen
-        tmp_table = self._get_tmp_table()
+        tmp_table = self._get_start_state()
         while i > 0 and j > 0:
             if tmp_table == 'M':
                 if self.dp_table[i][j] == self.dp_table_X[i-1][j-1] + self._s(self.query[i-1], self.target[j-1]):
@@ -224,7 +232,8 @@ class NeedlemanWunschGotoh(Alignment):
         self.aligned_query = self.aligned_query[::-1]
         self.aligned_target = self.aligned_target[::-1]
 
-    def _get_tmp_table(self):
+    def _get_start_state(self):
+        """スコアの一番高いテーブルを探す"""
         max_score = max(
             self.dp_table[-1][-1], self.dp_table_X[-1][-1], self.dp_table_Y[-1][-1])
         if self.dp_table[-1][-1] == max_score:
@@ -236,7 +245,9 @@ class NeedlemanWunschGotoh(Alignment):
 
 
 class SmithWaterman(Alignment):
+    """ローカルアラインメント"""
     def _init_dp_table(self):
+        """_generate_dp_table()メソッドで初期化済み"""
         pass
         # self.dp_table[0][0] = 0
         # for i in range(1, self.qlen + 1):
@@ -256,7 +267,7 @@ class SmithWaterman(Alignment):
                 self.score = max(self.score, self.dp_table[i][j])
     
     def _traceback(self):
-        i, j = self._get_start_subscript()
+        i, j = self._get_start_state()
         while i > 0 and j > 0 and self.dp_table[i][j] > 0:
             if self.dp_table[i][j] == self.dp_table[i-1][j] - self.gap_penalty:
                 i -= 1
@@ -274,7 +285,8 @@ class SmithWaterman(Alignment):
         self.aligned_query = self.aligned_query[::-1]
         self.aligned_target = self.aligned_target[::-1]
 
-    def _get_start_subscript(self):
+    def _get_start_state(self):
+        """スコアの一番高いセルを探す"""
         max_score = 0
         start_i = start_j = 0
         for i in range(1, self.qlen + 1):
@@ -287,6 +299,7 @@ class SmithWaterman(Alignment):
 
 
 class SmithWatermanGotoh(Alignment):
+    """アフィンギャップペナルティつきローカルアラインメント"""
     def __init__(self, q, t, A, B, D, E):
         super().__init__(q, t, A, B, D)
         self.ext_penalty = E
@@ -294,6 +307,7 @@ class SmithWatermanGotoh(Alignment):
         self.dp_table_Y = self._generate_dp_table()
 
     def _init_dp_table(self):
+        """_generate_dp_table()メソッドで初期化済み"""
         pass
 
     def _calculate_score(self):
@@ -354,6 +368,7 @@ class SmithWatermanGotoh(Alignment):
         self.aligned_target = self.aligned_target[::-1]
 
     def _get_start_state(self):
+        """スコアの一番高いセルのテーブルを探す"""
         max_score = -1
         start_i = start_j = 0
         tmp_table = ''
