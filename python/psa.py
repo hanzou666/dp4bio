@@ -4,7 +4,7 @@
 """
 Pair-wise alignment algorithm for comparison of two genome sequences
 
-usage: python3 pairwise-alignment.py
+usage: python3 psa.py
 """
 
 from abc import ABCMeta, abstractmethod
@@ -70,6 +70,7 @@ class Alignment(metaclass=ABCMeta):
         self.dp_table = self._generate_dp_table()
         self.aligned_query = ''
         self.aligned_target = ''
+        self.score = -1
 
     @abstractmethod
     def _init_dp_table(self):
@@ -93,13 +94,10 @@ class Alignment(metaclass=ABCMeta):
         self._init_dp_table()
         self._calculate_score()
         self._traceback()
-        return (self.aligned_query, self.aligned_target)
+        return (self.aligned_query, self.aligned_target, self.score)
 
 
 class NeedlemanWunsch(Alignment):
-    def __init__(self, q, t, A, B, D):
-        super().__init__(q, t, A, B, D)
-
     def _init_dp_table(self):
         self.dp_table[0][0] = 0
         for i in range(1, self.qlen + 1):
@@ -115,6 +113,7 @@ class NeedlemanWunsch(Alignment):
                     self.dp_table[i-1][j] - self.gap_penalty,
                     self.dp_table[i-1][j-1] + self._s(self.query[i-1], self.target[j-1])
                 )
+                self.score = max(self.score, self.dp_table[i][j])
 
     def _traceback(self):
         i = self.qlen
@@ -181,6 +180,12 @@ class NeedlemanWunschGotoh(Alignment):
                     self.dp_table[i-1][j] - self.gap_penalty,
                     self.dp_table_Y[i-1][j] - self.ext_penalty
                 )
+                self.score = max(
+                    self.score,
+                    self.dp_table[i][j],
+                    self.dp_table_X[i][j],
+                    self.dp_table_Y[i][j]
+                )
 
     def _traceback(self):
         i = self.qlen
@@ -231,15 +236,13 @@ class NeedlemanWunschGotoh(Alignment):
 
 
 class SmithWaterman(Alignment):
-    def __init__(self, q, t, A, B, D):
-        return super().__init__(q, t, A, B, D)
-
     def _init_dp_table(self):
-        self.dp_table[0][0] = 0
-        for i in range(1, self.qlen + 1):
-            self.dp_table[i][0] = 0
-        for j in range(1, self.tlen + 1):
-            self.dp_table[0][j] = 0
+        pass
+        # self.dp_table[0][0] = 0
+        # for i in range(1, self.qlen + 1):
+        #     self.dp_table[i][0] = 0
+        # for j in range(1, self.tlen + 1):
+        #     self.dp_table[0][j] = 0
 
     def _calculate_score(self):
         for i in range(1, self.qlen + 1):
@@ -250,6 +253,7 @@ class SmithWaterman(Alignment):
                     self.dp_table[i-1][j] - self.gap_penalty,
                     self.dp_table[i-1][j-1] + self._s(self.query[i-1], self.target[j-1])
                 )
+                self.score = max(self.score, self.dp_table[i][j])
     
     def _traceback(self):
         i, j = self._get_start_subscript()
@@ -311,6 +315,12 @@ class SmithWatermanGotoh(Alignment):
                     self.dp_table[i-1][j] - self.gap_penalty,
                     self.dp_table_Y[i-1][j] - self.ext_penalty
                 )
+                self.score = max(
+                    self.score,
+                    self.dp_table[i][j],
+                    self.dp_table_X[i][j],
+                    self.dp_table_Y[i][j]
+                )
 
     def _traceback(self):
         i, j, tmp_table = self._get_start_state()
@@ -364,7 +374,7 @@ class SmithWatermanGotoh(Alignment):
         return start_i, start_j, tmp_table
 
 
-def output_result(query, target):
+def output_result(query, target, score):
     symbol = ''
     for q, t in zip(query, target):
         symbol += '|' if q == t and q != '-' else ' '
@@ -378,6 +388,7 @@ def output_result(query, target):
     print(f'        {symbol}')
     print(f'target: {target}')
     print('')
+    print(f'score: {score}')
     print(f'{identity:.2f}% ({match_len}/{target_len})')
 
 
@@ -389,23 +400,23 @@ def main():
     print('')
     if 'nb' in args.methods:
         print('********* Needleman-Bunsch *********')
-        q, t = NeedlemanWunsch(args.query, args.target, args.A, args.B, args.D).run()
-        output_result(q, t)
+        q, t, s = NeedlemanWunsch(args.query, args.target, args.A, args.B, args.D).run()
+        output_result(q, t, s)
         print('')
     if 'nbg' in args.methods:
         print('****** Needleman-Bunsch-Gotoh ******')
-        q, t = NeedlemanWunschGotoh(args.query, args.target, args.A, args.B, args.D, args.E).run()
-        output_result(q, t)
+        q, t, s = NeedlemanWunschGotoh(args.query, args.target, args.A, args.B, args.D, args.E).run()
+        output_result(q, t, s)
         print('')
     if 'sw' in args.methods:
         print('********** Smith-Waterman **********')
-        q, t = SmithWaterman(args.query, args.target, args.A, args.B, args.D).run()
-        output_result(q, t)
+        q, t, s = SmithWaterman(args.query, args.target, args.A, args.B, args.D).run()
+        output_result(q, t, s)
         print('')
     if 'swg' in args.methods:
         print('******* Smith-Waterman-Gotoh *******')
-        q, t = SmithWatermanGotoh(args.query, args.target, args.A, args.B, args.D, args.E).run()
-        output_result(q, t)
+        q, t, s = SmithWatermanGotoh(args.query, args.target, args.A, args.B, args.D, args.E).run()
+        output_result(q, t, s)
 
 
 if __name__ == "__main__":
